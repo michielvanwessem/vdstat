@@ -1,0 +1,13 @@
+# TODO: This code needs to be cleaned up for major reasons.
+# a) what if we get something like vdstat -v eth0
+# b) does vdstat need to support an -i option
+# c) do we want to deal with multiple iface?
+
+make $1 take ethX as argument
+seperate logfiles for different ethX
+
+Write the mail-out module.
+Fix this so it actually can deal with gzipped logfiles.
+Write a showlog function that takes an argument and displays the xx many lines 
+  based on the date
+  

@@ -1,0 +1,419 @@
+#!/bin/bash
+#
+# All rights reserved.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+# * Redistributions of source code must retain the above copyright
+#         notice, this list of conditions and the following disclaimer.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Code base thanks to:
+# Michiel   <michiel.van.wessem@gmail.com>,
+# andarius  <andarius@errantnutron.com>,
+# mwalling  <markwalling@gmail.com>
+
+# function vd_main() thanks to andarius and mwalling.
+# function vd_report() thanks to andarius.
+
+# VDSTAT - VERSION
+version="2.6alpha_2"
+
+# Interface to monitor
+iface=${iface:-eth0}
+
+# Location of logfile
+cron_log="/var/log/vdstat"
+
+# Ammount of backup logfiles to keep. This will be automgically
+# rotated by vdstat.
+logfiles="5"
+
+# How often rotate logs
+log_rotate="monthly"
+
+# Gzip logs after usage (defaults to "No"
+gzip_logs="No"
+
+# Set counters to "0"
+rx="0"
+tx="0"
+
+# Set our rotation hour:
+ROTATE_AT="9"
+
+###*** DO NOT EDIT ANYTHING BELOW THIS LINE ***###
+repdate=$(date +%Y%m%d)
+startdate=$(date +%Y%m%d --date="1 day ago")
+reptime=$(date +%H\:%M)
+
+# Sanity Check
+if [[ ! -x /usr/bin/vnstat ]]; then
+    echo "vnstat not found, or not executable."
+    echo "exiting..."
+    exit 1
+fi
+
+function vd_main() {
+
+    OUTFILE=$(mktemp -t vnstat.XXXXXX) || exit 1
+    REPFILE=$(mktemp -t vnsrep.XXXXXX) || exit 1
+
+    # Fill the $OUTFILE:
+    if [[ $ROTATE_AT = 0 ]]; then
+        vnstat --dumpdb -i $iface | tail -n 24 >> $OUTFILE
+        CURCOUNT=$(date +%k)
+    else
+        # Set our rotation points:
+        TMP_TOP=$((24-$ROTATE_AT))
+        TMP_BOT=$(($ROTATE_AT))
+
+        # Starting with our rotation hour:
+        vnstat --dumpdb -i $iface | tail -n $TMP_TOP > $OUTFILE
+        # Finish with everything that is above the rotation
+        # hour in normal ordering:
+        vnstat --dumpdb -i $iface | tail -n 24 | head -n $TMP_BOT >> $OUTFILE
+    fi
+
+    # Establish current hour pointer:
+    CURCOUNT=$(grep "h;$(date +%k | sed -e 's/^ *//' -e 's/ *$//');" -n $OUTFILE | cut -d ":" -f 1)
+
+    # Calculate data amounts:
+    for i in $(cat $OUTFILE | head -n $CURCOUNT | cut -d ";" -f 4);
+    do
+        rx=$(($[$rx] + $[$i]))
+    done
+
+    for i in $(cat $OUTFILE | head -n $CURCOUNT | cut -d ";" -f 5);
+    do
+        tx=$(($[$tx] + $[$i]))
+    done
+}
+
+function vd_total() {
+    vd_main
+
+    # Calculate totals
+    Rx=$(($rx/1024))
+    Tx=$(($tx/1024))
+    TKb=$(($tx+$rx))
+    TMb=$(($TKb/1024))
+
+    # We sort the formatting here as this makes it a lot more easier when
+    # we actually write the reporting part.
+    # Set the formatting for the received traffic
+
+    if [[ $Rx -lt 10 ]]; then
+        RRx="     $Rx"
+    elif [[ $Rx -lt 100 ]]; then
+        RRx="    $Rx"
+    elif [[ $Rx -lt 1000 ]]; then
+        RRx="   $Rx"
+    elif [[ $Rx -lt 10000 ]]; then
+        RRx="  $Rx"
+    elif [[ $Rx -lt 100000 ]]; then
+        RRx=" $Rx"
+    else
+        RRx="$Rx"
+    fi
+
+    # Set the formatting for the transmitted traffic
+    if [[ $Tx -lt 10 ]]; then
+        RTx="     $Tx"
+    elif [[ $Tx -lt 100 ]]; then
+        RTx="    $Tx"
+    elif [[ $Tx -lt 1000 ]]; then
+        RTx="   $Tx"
+    elif [[ $Tx -lt 10000 ]]; then
+        RTx="  $Tx"
+    elif [[ $Tx -lt 100000 ]]; then
+        RTx=" $Tx"
+    else
+        RTx="$Tx"
+    fi
+
+    # Set the formatting for the total traffic
+    if [[ $TMb -lt 10 ]]; then
+        RTMB="     $TMb"
+    elif [[ $TMb -lt 100 ]]; then
+        RTMB="    $TMb"
+    elif [[ $TMb -lt 1000 ]]; then
+        RTMB="   $TMb"
+    elif [[ $TMb -lt 10000 ]]; then
+        RTMB="  $TMb"
+    elif [[ $Tmb -lt 100000 ]]; then
+        RTMB=" $TMb"
+    else
+        RTMB="$TMb"
+    fi
+}
+
+function vd_int() {
+    vd_total
+    # How many hours have passed?:
+    HPASSED=$(($CURCOUNT-1))
+    # Do we want hour or hours?:
+    if [[ $HPASSED != 1 ]]; then
+        DWHAS="s"
+    fi
+    # Display the output. Changed $tval to $CURCOUNT:
+    echo
+    echo "Report Generated on: $(date)"
+    echo
+    echo "   Received    = $RRx MB ($rx kB)"
+    echo "   Transmitted = $RTx MB ($tx kB)"
+    echo "  +----------------------------------+"
+    echo "   Data Usage  = $RTMB MB ($TKb kB)"
+    echo "  Measured over a period of $HPASSED hour$DWHAS"
+    echo
+}
+
+function vd_rheader() {
+    if [[ -e $cron_log ]]; then
+        # starts at line 3 and goes to the end.
+        tail -n +3 $cron_log > $REPFILE
+        rm $cron_log
+        touch $cron_log
+    fi
+
+    echo " StartDate - EndDate | Time  | Total Rx  | Total Tx  | Total Traffic" >> $cron_log
+    echo "---------------------+-------+-----------+-----------+----------------" >> $cron_log
+}
+
+function vd_switch() {
+    # Amazing internal logration ahead!!
+    high_log=$(echo $cron_log.* 2> /dev/null | awk -F . '{ print $NF }')
+
+    if [[ $high_log -eq $logfiles ]]; then
+        num_old=$logfiles
+    else
+        num_old=$high_log
+    fi
+
+    until [[ $num_old -le "0" ]]; do
+        num_new=$(($num_old + 1))
+        mv $cron_log.$num_old $cron_log.$num_new
+        num_old=$(($num_old - 1))
+    done
+
+    num_old=$(($num_old + 1))
+    mv $cron_log $cron_log.$num_old
+}
+
+function vd_rotate() {
+    # Only run this when being run as root (which include
+    # being run from cron
+    if [[ $UID -eq "0" ]]; then
+
+        rotday=$(date +%-d)
+        if [[ "$rotday" -eq "1" || $1 = "rotate" ]]; then
+            vd_switch
+            # Write a new header to $cron_log. This has to be called here
+            # otherwise it wipes out the logfile if called from vd_cron()
+            vd_rheader
+        fi
+    fi
+}
+
+function vd_cron() {
+    vd_total
+    vd_rheader
+    stlines=$(grep -v "\-\-\-\-" $REPFILE | wc -l | awk '{ print $1}')
+    if [[ $stlines -ne "0" ]]; then
+        marker=$(($stlines % 7))
+        if [[ $marker -eq "0" ]]; then
+            echo "---------------------+-------+-----------+-----------+----------------" >> $REPFILE
+        fi
+    fi
+    cat $REPFILE >> $cron_log
+    echo " $startdate - $repdate | $reptime | $RRx MB | $RTx MB | $RTMB MB" >> $cron_log
+
+    # Rotate logfiles on the first of the month.
+    vd_rotate
+}
+
+function vd_mail() {
+    #vd_report
+    echo "Message for you, Sir *argh*"
+}
+
+function vd_report() {
+    # Set some vars we need to 0, good starting point ;) :
+    vd_report_rx="0"
+    vd_report_tx="0"
+    vd_report_tt="0"
+
+    # Compressed logs or no:
+    if [[ $gzip_logs = "No" ]]; then
+        vd_days=$cron_log
+    else
+        vd_days=$cron_log.gz
+    fi
+
+    # Figure out how many days we need:
+    if [[ -z "$1" ]]; then
+        vd_daycount="7"
+    elif [[ $1 = "m" ]]; then
+        vd_daycount="30"
+    elif [[ $1 = "l" ]]; then
+        vd_days="$vd_days.1"
+        vd_daycount=$(grep [0-9] $vd_days | wc -l)
+    elif [[ $1 = "c" ]]; then
+        vd_daycount=$(grep [0-9] $vd_days | wc -l)
+    elif [ $1 -eq $1 2> /dev/null ]; then
+        vd_daycount="$1"
+    else
+        vd_daycount="7"
+    fi
+
+    # Figure out what to grep and get the start/end dates::
+    if [[ $1 = "a" ]]; then
+        # We got "a" which is everything:
+        vd_grep="$vd_days*"
+        vd_report_start=$(grep [0-9] $vd_grep | cut -d ":" -f 2- | sort | head -n 1 | awk '{ print $1 }')
+        vd_report_end=$(grep [0-9] $vd_grep | cut -d ":" -f 2- | sort | tail -n 1 | awk '{ print $3 }')
+
+        # Get the data:
+        for i in $(grep [0-9] $vd_grep | cut -d "|" -f 3- | awk '{ print $1 }');
+            do vd_report_rx=$(($vd_report_rx+$i));
+            done
+        for i in $(grep [0-9] $vd_grep | cut -d "|" -f 3- | awk '{ print $4 }');
+            do vd_report_tx=$(($vd_report_tx+$i));
+            done
+        for i in $(grep [0-9] $vd_grep | cut -d "|" -f 3- | awk '{ print $7 }');
+            do vd_report_tt=$(($vd_report_tt+$i));
+            done
+    else
+        # Should be "w" or "m" so we only need a max of 30 lines:
+        if [[ $(grep [0-9] $vd_days | wc -l) -ge $vd_daycount ]]; then
+            # We are good, run with it:
+            vd_grep=$vd_days
+            vd_report_start=$(grep [0-9] $vd_grep | tail -n $vd_daycount | head -n 1 | awk '{ print $1 }')
+            vd_report_end=$(grep [0-9] $vd_grep | tail -n 1 | awk '{ print $3 }')
+        else
+            # We need bonus entries. get them
+            vd_grep="$vd_days*"
+            vd_report_start=$(grep [0-9] $vd_grep | cut -d ":" -f 2- | sort | tail -n $vd_daycount | head -n 1 | awk '{ print $1 }')
+            vd_report_end=$(grep [0-9] $vd_grep | cut -d ":" -f 2- | sort | tail -n 1 | awk '{ print $3 }')
+        fi
+
+    # Get the data:
+    for i in $(grep [0-9] $vd_grep | tail -n $vd_daycount | cut -d "|" -f 3- | awk '{ print $1 }');
+        do vd_report_rx=$(($vd_report_rx+$i));
+        done
+    for i in $(grep [0-9] $vd_grep | tail -n $vd_daycount | cut -d "|" -f 3- | awk '{ print $4 }');
+        do vd_report_tx=$(($vd_report_tx+$i));
+        done
+    for i in $(grep [0-9] $vd_grep | tail -n $vd_daycount | cut -d "|" -f 3- | awk '{ print $7 }');
+        do vd_report_tt=$(($vd_report_tt+$i));
+        done
+    fi
+
+
+    # Output the data we have gathered"
+    echo
+    echo "Report Generated on: $(date)"
+    echo
+    if [[ -z "$1" ]]; then
+        echo "         7 Day Report"
+    elif [[ $1 = "m" ]]; then
+        echo "        30 Day Report"
+    elif [[ $1 = "l" || $1 = "c" ]]; then
+        echo "      $(date +%B -d $vd_report_start) Report"
+    elif [[ $1 = "a" ]]; then
+        echo "      Complete History"
+    elif [ $1 -eq $1 2> /dev/null ]; then
+        echo "        $1 Day Report"
+    else
+        echo "         7 Day Report"
+    fi
+    echo "  +---------------------------+"
+    echo "    Start date = $vd_report_start"
+    echo "    End date   = $vd_report_end"
+    echo "    Receive    = $vd_report_rx MB"
+    echo "    Transmit   = $vd_report_tx MB"
+    echo "    Total      = $vd_report_tt MB"
+    echo
+}
+
+function vd_showlog() {
+    rotday=$(date +%-d)
+
+    if [[ -z $1 ]]; then
+        if [[ "$rotday" -eq "1" ]]; then
+            if [[ -r $cron_log.1 ]]; then
+                cat $cron_log.1
+                exit 0
+            fi
+        else
+            cat $cron_log
+            exit 0
+        fi
+    else
+        if [[ $1 -gt $logfiles ]]; then
+            echo "Sorry. These are not the logfiles we're keeping here."
+            exit 1
+        elif [[ $1 -le $logfiles ]]; then
+            backlog=$1
+            cat $cron_log.$backlog
+        fi
+    fi
+}
+
+function vd_clean() {
+    rm $OUTFILE
+    rm $REPFILE
+}
+
+# TODO: This code needs to be cleaned up for major reasons.
+# a) what if we get something like vdstat -v eth0
+# b) does vdstat need to support an -i option
+# c) do we want to deal with multiple iface?
+haveif=$(echo "$1" | colrm 4)
+if [[ "$haveif" == "eth" ]]; then
+    iface=$1
+    shift
+fi
+
+case "$1" in
+    -c | --cron)
+        vd_cron
+        vd_clean
+        ;;
+    -h | --help)
+        echo "oh come on, figure it out yourself"
+        ;;
+    -l | --logrotate | --rotate)
+        vd_rotate rotate
+        ;;
+    -m | --mail)
+        vd_mail
+        ;;
+    -r | --report)
+        vd_report "$2"
+        ;;
+    -s | --show | --showlog)
+        vd_showlog "$2"
+        ;;
+    -v | --version)
+        echo "$(basename $0), version $version"
+        ;;
+    *)
+        # anything else
+        vd_int
+        vd_clean
+        ;;
+esac
+
+# EOF

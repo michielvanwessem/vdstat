@@ -1,0 +1,45 @@
+.TH "vdstat" "1" "2.5" "Michiel van Wessem <michiel.van.wessem@gmail.com>" "Utils"
+
+.SH "NAME"
+vdstat - a console front end for the vnstat program
+
+
+.SH "SYNOPSIS"
+.LP
+.B vdstat 
+[-c] [-s] [-v] [-r{ m | l | a }]
+
+
+.SH "DESCRIPTION"
+.B Vdstat 
+is a console front end for the vnstat(1) program.
+.B Vdstat
+was developped to deal with the one thing that vnstat can't do t the moment.
+Because vnstat deals with traffic measurement on a precises twentyfour hour bases,
+(that being from 00:00 - 23:59), it becomes more difficult to use when you have an
+Internet Provider, that uses some kind of traffic shapping based on another set 
+of qualification. For example from 09:00AM - 08:59AM). This requires the data 
+collected by vnstat to be displayed in some way.
+
+
+.SH "OPTIONS"
+Should include options and parameters.
+
+
+.SH "BUGS"
+.LP
+.B Vdstat
+requires the 
+.I vnstat
+program to be installed on the system.
+vnstat can be obtained from http://humdi.net/vnstat/
+
+
+.SH "AUTHORS"
+vdstat is developped by Michiel van Wessem <michiel.van.wessem@gmail.com> and 
+.br
+andarius <andarius@errantnutron.com>.
+
+
+.SH "SEE ALSO"
+Cross references and citations.
