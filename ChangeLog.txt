@@ -1,4 +1,7 @@
 TO BE ANNOUNCED
+Fixed a condition that would make vdstat spew errors if there is no 
+ logfile and we request reporting through the -r switch. Thanks to 
+ andarious for pointing this out.
 Removed the use of variable "gzip_logs". Considering this behaviour is 
   not used in Slackware anyway. Add to this the overhead in code that
   compressed logs would give, it's just not worth it.

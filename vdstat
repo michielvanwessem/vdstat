@@ -246,10 +246,19 @@ function vd_mail() {
 }
 
 function vd_report() {
+    # Let's check if we have enough data to work with.
+    # If we don't have any logs we don't have any data.
+    # This should only happen once, but that is enough...
+    if [[ ! -e $cron_log ]]; then
+        echo "We do not have enough data to report on at this time..."
+        exit 1
+    fi
+
     # Set some vars we need to 0, good starting point ;) :
     vd_report_rx="0"
     vd_report_tx="0"
     vd_report_tt="0"
+    vd_days=$cron_log   #for historic reasons
 
     # Figure out how many days we need:
     if [[ -z "$1" ]]; then
