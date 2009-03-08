@@ -1,4 +1,7 @@
 TO BE ANNOUNCED
+Removed the use of variable "gzip_logs". Considering this behaviour is 
+  not used in Slackware anyway. Add to this the overhead in code that
+  compressed logs would give, it's just not worth it.
 Removed the absurdly long var "logfiles_to_keep". This turned out not 
   to be functional at all and just made things a whole lot more complex
   Replaced by a simple logfiles="xx" where xx is the number of months.

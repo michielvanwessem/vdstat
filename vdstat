@@ -43,9 +43,6 @@ logfiles="5"
 # How often rotate logs
 log_rotate="monthly"
 
-# Gzip logs after usage (defaults to "No"
-gzip_logs="No"
-
 # Set counters to "0"
 rx="0"
 tx="0"
@@ -253,13 +250,6 @@ function vd_report() {
     vd_report_rx="0"
     vd_report_tx="0"
     vd_report_tt="0"
-
-    # Compressed logs or no:
-    if [[ $gzip_logs = "No" ]]; then
-        vd_days=$cron_log
-    else
-        vd_days=$cron_log.gz
-    fi
 
     # Figure out how many days we need:
     if [[ -z "$1" ]]; then
