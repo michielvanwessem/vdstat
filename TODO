@@ -1,3 +1,7 @@
+*- Make sure the database gets updated before the last polling.
+    ie if we rotate at 09:00 we need to update the database at 0859
+    otherwise the results could be off
+
 *- Do we need to track multiple interfaces? [yes/no]
     \- make $1 take ethX as argument
     \- seperate logfiles for different ethX
