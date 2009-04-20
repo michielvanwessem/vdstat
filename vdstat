@@ -374,6 +374,16 @@ function vd_showlog() {
     fi
 }
 
+function vd_help() {
+	# let's see if we have a manpage somewhere we can call
+	if [[ -e /usr/man/man1/vdstat.1.gz || -e /usr/local/man/man1/vdstat.1.gz ]]; then
+		man vdstat 
+	else
+		echo "Well, we don't seem to have a manpage, but....."
+		echo "figure it out yourself! (use the source!)"
+	fi
+}
+
 function vd_clean() {
     rm $OUTFILE
     rm $REPFILE
@@ -395,7 +405,7 @@ case "$1" in
         vd_clean
         ;;
     -h | --help)
-        echo "oh come on, figure it out yourself"
+        vd_help
         ;;
     -l | --logrotate | --rotate)
         vd_rotate rotate
