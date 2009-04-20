@@ -254,7 +254,7 @@ function vd_report() {
         exit 1
     fi
 
-    # Set some vars we need to 0, good starting point ;) :
+    # Set some vars we need to 0, good starting point. ;) 
     vd_report_rx="0"
     vd_report_tx="0"
     vd_report_tt="0"
@@ -302,8 +302,8 @@ function vd_report() {
         if [[ $(grep [0-9] $vd_days | wc -l) -ge $vd_daycount ]]; then
             # We are good, run with it:
             vd_grep=$vd_days
-            vd_report_start=$(grep -H [0-9] $vd_grep | tail -n $vd_daycount | head -n 1 | awk '{ print $1 }')
-            vd_report_end=$(grep -H [0-9] $vd_grep | tail -n 1 | awk '{ print $3 }')
+            vd_report_start=$(grep -H [0-9] $vd_grep | cut -d ":" -f 2-| sort | tail -n $vd_daycount | head -n 1 | awk '{ print $1 }')
+            vd_report_end=$(grep -H [0-9] $vd_grep | cut -d ":" -f 2- | sort | tail -n 1 | awk '{ print $3 }')
         else
             # We need bonus entries. get them
             vd_grep="$vd_days*"
