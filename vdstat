@@ -224,6 +224,15 @@ function vd_rotate() {
 }
 
 function vd_cron() {
+    # Update the database first.
+    if [[ -x /usr/bin/vnstat && $(ls /var/lib/vnstat/ | wc -l) -ge 1 ]]; then 
+      /usr/bin/vnstat -u
+    fi
+    
+    # lets way for everything to work
+    sleep 2
+
+    # Now we are ready to get to work.
     vd_total
     vd_rheader
     stlines=$(grep -v "\-\-\-\-" $REPFILE | wc -l | awk '{ print $1}')
@@ -374,16 +383,6 @@ function vd_showlog() {
     fi
 }
 
-function vd_help() {
-	# let's see if we have a manpage somewhere we can call
-	if [[ -e /usr/man/man1/vdstat.1.gz || -e /usr/local/man/man1/vdstat.1.gz ]]; then
-		man vdstat 
-	else
-		echo "Well, we don't seem to have a manpage, but....."
-		echo "figure it out yourself! (use the source!)"
-	fi
-}
-
 function vd_clean() {
     rm $OUTFILE
     rm $REPFILE
@@ -405,7 +404,7 @@ case "$1" in
         vd_clean
         ;;
     -h | --help)
-        vd_help
+        echo "oh come on, figure it out yourself"
         ;;
     -l | --logrotate | --rotate)
         vd_rotate rotate
